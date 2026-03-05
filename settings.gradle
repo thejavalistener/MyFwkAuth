@@ -1,0 +1,3 @@
+rootProject.name = 'MyFwkAuth'
+includeBuild('../MyFwkUtils') 
+includeBuild('../MyFwkBackend')

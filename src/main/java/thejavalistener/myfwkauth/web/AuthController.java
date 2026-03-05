@@ -1,0 +1,130 @@
+package thejavalistener.myfwkauth.web;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import thejavalistener.myfwkauth.AuthException;
+import thejavalistener.myfwkauth.AuthFacade;
+import thejavalistener.myfwkauth.OtpChannel;
+import thejavalistener.myfwkauth.TokenPair;
+import thejavalistener.myfwkauth.domain.AuthUser;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController
+{
+	@Autowired
+	private AuthFacade auth;
+	
+	public AuthController()
+	{
+		System.out.println("--- ABANICO LOCOMIA ---");
+	}
+
+	@PostMapping("/otp")
+	public ResponseEntity<Void> requestOtp(@RequestBody OtpRequest req)
+	{
+		auth.generateOtp(req.channel, req.destination);
+		return ResponseEntity.ok().build();
+	}
+
+	@PostMapping("/login")
+	public ResponseEntity<TokenPair> login(@RequestBody LoginRequest req) throws AuthException
+	{
+		TokenPair pair = auth.login(req.channel, req.destination, req.otp);
+		return ResponseEntity.ok(pair);
+	}
+
+	@PostMapping("/refresh")
+	public ResponseEntity<TokenPair> refresh(@RequestBody RefreshRequest req)
+	{
+		TokenPair pair = auth.refresh(req.refreshToken);
+		if(pair == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+		return ResponseEntity.ok(pair);
+	}
+
+	@PostMapping("/logout")
+	public ResponseEntity<Void> logout(@RequestBody LogoutRequest req)
+	{
+		auth.logout(req.refreshToken);
+		return ResponseEntity.ok().build();
+	}
+
+	@GetMapping("/me")
+	public ResponseEntity<AuthUserDTO> me(@RequestHeader(value="Authorization", required=false) String authHeader)
+	{
+		String accessToken = _extractBearer(authHeader);
+		if(accessToken == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+		AuthUser u = auth.getUserFromAccessToken(accessToken);
+		if(u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+		return ResponseEntity.ok(AuthUserDTO.from(u));
+	}
+
+	@ExceptionHandler(AuthException.class)
+	public ResponseEntity<AuthError> onAuthException(AuthException ex)
+	{
+		AuthError err = new AuthError();
+		err.reason = ex.getReason() != null ? ex.getReason().name() : "AUTH_ERROR";
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(err);
+	}
+
+	private String _extractBearer(String header)
+	{
+		if(header == null) return null;
+		String h = header.trim();
+		if(h.length() < 8) return null;
+		if(!h.regionMatches(true, 0, "Bearer ", 0, 7)) return null;
+		String token = h.substring(7).trim();
+		return token.isEmpty() ? null : token;
+	}
+
+	// ================= DTOs =================
+
+	public static class OtpRequest
+	{
+		public OtpChannel channel;
+		public String destination;
+	}
+
+	public static class LoginRequest
+	{
+		public OtpChannel channel;
+		public String destination;
+		public String otp;
+	}
+
+	public static class RefreshRequest
+	{
+		public String refreshToken;
+	}
+
+	public static class LogoutRequest
+	{
+		public String refreshToken;
+	}
+
+	public static class AuthUserDTO
+	{
+		public int userId;
+		public OtpChannel channel;
+		public String destination;
+
+		public static AuthUserDTO from(AuthUser u)
+		{
+			AuthUserDTO dto = new AuthUserDTO();
+			dto.userId = u.getUserId();
+			dto.channel = u.getChannel();
+			dto.destination = u.getDestination();
+			return dto;
+		}
+	}
+
+	public static class AuthError
+	{
+		public String reason;
+	}
+}
