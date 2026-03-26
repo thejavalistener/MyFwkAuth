@@ -18,7 +18,7 @@ import thejavalistener.myfwkauth.domain.AuthOtp;
 import thejavalistener.myfwkauth.domain.AuthToken;
 import thejavalistener.myfwkauth.domain.AuthUser;
 
-public class AuthFacade
+public class AuthService
 {
 	@Autowired
 	private AuthConfig config;
@@ -28,7 +28,7 @@ public class AuthFacade
 
 	private OtpSender otpSender;
 
-	public AuthFacade(OtpSender otpSender)
+	public AuthService(OtpSender otpSender)
 	{
 		this.otpSender=otpSender;
 	}
@@ -146,7 +146,7 @@ public class AuthFacade
 		{
 			o.setAttempts(o.getAttempts()+1);
 
-			if(o.getAttempts()>=config.security.maxLoginAttempts)
+			if(o.getAttempts()>=config.otp.maxAttempts)
 			{
 				dao.delete(o);
 				throw new AuthException(AuthException.Reason.BLOCKED_OTP);

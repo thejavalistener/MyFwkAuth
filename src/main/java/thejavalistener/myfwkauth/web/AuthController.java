@@ -3,10 +3,16 @@ package thejavalistener.myfwkauth.web;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import thejavalistener.myfwkauth.AuthException;
-import thejavalistener.myfwkauth.AuthFacade;
+import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
 import thejavalistener.myfwkauth.domain.AuthUser;
@@ -16,13 +22,8 @@ import thejavalistener.myfwkauth.domain.AuthUser;
 public class AuthController
 {
 	@Autowired
-	private AuthFacade auth;
+	private AuthService auth;
 	
-	public AuthController()
-	{
-		System.out.println("--- ABANICO LOCOMIA ---");
-	}
-
 	@PostMapping("/otp")
 	public ResponseEntity<Void> requestOtp(@RequestBody OtpRequest req)
 	{
@@ -105,22 +106,6 @@ public class AuthController
 	public static class LogoutRequest
 	{
 		public String refreshToken;
-	}
-
-	public static class AuthUserDTO
-	{
-		public int userId;
-		public OtpChannel channel;
-		public String destination;
-
-		public static AuthUserDTO from(AuthUser u)
-		{
-			AuthUserDTO dto = new AuthUserDTO();
-			dto.userId = u.getUserId();
-			dto.channel = u.getChannel();
-			dto.destination = u.getDestination();
-			return dto;
-		}
 	}
 
 	public static class AuthError
