@@ -5,18 +5,18 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import thejavalistener.myfwkauth.AuthException;
-import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
+import thejavalistener.myfwkauth.XX;
 import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthCredential;
 
 public class AuthClient
 {
 	@Autowired
-	private AuthService auth;
+	private XX auth;
 
-	public AuthClient(AuthService auth)
+	public AuthClient(XX auth)
 	{
 		this.auth = auth;
 	}

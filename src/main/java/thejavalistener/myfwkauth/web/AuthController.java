@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import thejavalistener.myfwkauth.AuthException;
-import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
+import thejavalistener.myfwkauth.XX;
 import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthCredential;
 
@@ -25,7 +25,7 @@ import thejavalistener.myfwkauth.domain.AuthCredential;
 public class AuthController
 {
 	@Autowired
-	private AuthService auth;
+	private XX auth;
 	
 	@PostMapping("/otp")
 	public ResponseEntity<Void> requestOtp(@RequestBody OtpRequest req)

@@ -20,7 +20,7 @@ import thejavalistener.myfwkauth.domain.AuthOtp;
 import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthToken;
 
-public class AuthService
+public class AuthService 
 {
 	@Autowired
 	private AuthConfig config;
@@ -37,36 +37,6 @@ public class AuthService
 
 	// ================= OTP =================
 
-//	@Transactional
-//	public void generateOtp(OtpChannel channel, String destination)
-//	{
-//		String hql="";
-//		hql+="FROM AuthOtp ";
-//		hql+="WHERE destination=:destination ";
-//		hql+="  AND channel=:channel ";
-//
-//		AuthOtp otp=dao.querySingleRow(hql,"destination",destination,"channel",channel);
-//
-//		if(otp==null)
-//		{
-//			otp=new AuthOtp();
-//			otp.setDestination(destination);
-//			otp.setChannel(channel);
-//			dao.insert(otp);
-//		}
-//
-//		otp.setAttempts(0);
-//
-//		int otpCodeLen=config.otp.length;
-//		String code=MyString.generateRandom('0','9',otpCodeLen,otpCodeLen);
-//		otp.setCodeHash(_hash(code));
-//
-//		long ts=System.currentTimeMillis();
-//		otp.setGeneratedAt(new Timestamp(ts));
-//		otp.setExpiresAt(new Timestamp(ts+config.otp.expirationMs));
-//
-//		otpSender.send(channel,destination,code);
-//	}
 
 	@Transactional
 	public void generateOtp(OtpChannel channel, String destination)
@@ -313,41 +283,6 @@ public class AuthService
 
 		dao.update(hql,"pid",personId,"now",new Timestamp(System.currentTimeMillis()));
 	}
-
-//	@Transactional
-//	public void linkCredential(int personId, OtpChannel channel, String destination, String otp) throws AuthException
-//	{
-//		// validar OTP
-//		_verifyOtp(channel, destination, otp);
-//
-//		// evitar duplicados
-//		String hql="";
-//		hql+="FROM AuthCredential ";
-//		hql+="WHERE channel=:channel ";
-//		hql+="  AND destination=:destination ";
-//
-//		AuthCredential existing = dao.querySingleRow(hql, "channel", channel, "destination", destination);
-//
-//		if(existing != null)
-//		{
-//			// ya existe → no hacer nada o lanzar excepción si querés
-//			return;
-//		}
-//
-//		// buscar persona
-//		AuthPerson p = dao.find(AuthPerson.class, personId);
-//		if(p == null) return;
-//
-//		// crear credencial
-//		AuthCredential cred = new AuthCredential();
-//		cred.setChannel(channel);
-//		cred.setDestination(destination);
-//		cred.setCreatedAt(new Timestamp(System.currentTimeMillis()));
-//		cred.setPerson(p);
-//
-//		dao.insert(cred);
-//	}
-
 
 	@Transactional
 	public void linkCredential(int personId, OtpChannel channel, String destination, String otp) throws AuthException
