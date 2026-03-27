@@ -1,12 +1,15 @@
 package thejavalistener.myfwkauth.web;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 
 import thejavalistener.myfwkauth.AuthException;
 import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
-import thejavalistener.myfwkauth.domain.AuthUser;
+import thejavalistener.myfwkauth.domain.AuthPerson;
+import thejavalistener.myfwkauth.domain.AuthCredential;
 
 public class AuthClient
 {
@@ -48,16 +51,17 @@ public class AuthClient
 
 	// ================= ME =================
 
-	public AuthUserDTO me(String accessToken)
+	public AuthPersonDTO me(String accessToken)
 	{
 		if(accessToken == null || accessToken.isBlank()) return null;
 
-		AuthUser u = auth.getUserFromAccessToken(accessToken);
-		if(u == null) return null;
+		AuthPerson p = auth.getPersonFromAccessToken(accessToken);
+		if(p == null) return null;
 
-		return AuthUserDTO.from(u);
-	}
-	
+		List<AuthCredential> users = auth.getCredentialsByPerson(p.getPersonId());
+
+		return AuthPersonDTO.from(p, users);
+	}	
 	// ================= HELPERS =================
 
 }

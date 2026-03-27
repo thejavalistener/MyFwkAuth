@@ -9,39 +9,45 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import thejavalistener.myfwkauth.OtpChannel;
 
 @Entity
-@Table(name="auth_user")
-public class AuthUser
+@Table(name="auth_credential")
+public class AuthCredential
 {
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "user_id")
-	private int userId;
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	@Column(name="credential_id")
+	private int credentialId;
+
+	@ManyToOne
+	@JoinColumn(name="person_id")
+	private AuthPerson person;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name="channel")
 	private OtpChannel channel;
 
-	@Column(name = "destination")
+	@Column(name="destination")
 	private String destination;
 
-	@Column(name = "created_at")
+	@Column(name="created_at")
 	private Timestamp createdAt;
 
-	@Column(name = "deleted_at")
+	@Column(name="deleted_at")
 	private Timestamp deletedAt;
 
-	public int getUserId()
+	public int getCredentialId()
 	{
-		return userId;
+		return credentialId;
 	}
 
-	public void setUserId(int userId)
+	public void setCredentialId(int credentialId)
 	{
-		this.userId=userId;
+		this.credentialId=credentialId;
 	}
 
 	public OtpChannel getChannel()
@@ -82,5 +88,15 @@ public class AuthUser
 	public void setDeletedAt(Timestamp deletedAt)
 	{
 		this.deletedAt=deletedAt;
+	}
+
+	public AuthPerson getPerson()
+	{
+		return person;
+	}
+
+	public void setPerson(AuthPerson person)
+	{
+		this.person=person;
 	}
 }

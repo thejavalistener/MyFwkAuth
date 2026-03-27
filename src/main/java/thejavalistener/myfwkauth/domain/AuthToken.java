@@ -16,33 +16,33 @@ import jakarta.persistence.Table;
 public class AuthToken
 {
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "token_id")
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+	@Column(name="token_id")
 	private int tokenId;
 
 	@ManyToOne
-	@JoinColumn(name = "user_id")
-	private AuthUser user;
+	@JoinColumn(name="person_id")
+	private AuthPerson person;
 
-	@Column(name = "access_token")
+	@Column(name="access_token")
 	private String accessToken;
 
-	@Column(name = "refresh_token")
+	@Column(name="refresh_token")
 	private String refreshToken;
 
-	@Column(name = "access_token_issued_at")
+	@Column(name="access_token_issued_at")
 	private Timestamp accessTokenIssuedAt;
 
-	@Column(name = "access_token_expires_at")
+	@Column(name="access_token_expires_at")
 	private Timestamp accessTokenExpiresAt;
 
-	@Column(name = "refresh_token_issued_at")
+	@Column(name="refresh_token_issued_at")
 	private Timestamp refreshTokenIssuedAt;
 
-	@Column(name = "refresh_token_expires_at")
+	@Column(name="refresh_token_expires_at")
 	private Timestamp refreshTokenExpiresAt;
 
-	@Column(name = "revoked_at")
+	@Column(name="revoked_at")
 	private Timestamp revokedAt;
 
 	public int getTokenId()
@@ -53,16 +53,6 @@ public class AuthToken
 	public void setTokenId(int tokenId)
 	{
 		this.tokenId=tokenId;
-	}
-
-	public AuthUser getUser()
-	{
-		return user;
-	}
-
-	public void setUser(AuthUser user)
-	{
-		this.user=user;
 	}
 
 	public String getAccessToken()
@@ -133,5 +123,15 @@ public class AuthToken
 	public void setRevokedAt(Timestamp revokedAt)
 	{
 		this.revokedAt=revokedAt;
+	}
+
+	public AuthPerson getPerson()
+	{
+		return person;
+	}
+
+	public void setPerson(AuthPerson person)
+	{
+		this.person=person;
 	}
 }

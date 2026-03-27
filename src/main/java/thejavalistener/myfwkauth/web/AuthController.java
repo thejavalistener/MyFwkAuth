@@ -1,5 +1,7 @@
 package thejavalistener.myfwkauth.web;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +17,8 @@ import thejavalistener.myfwkauth.AuthException;
 import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
-import thejavalistener.myfwkauth.domain.AuthUser;
+import thejavalistener.myfwkauth.domain.AuthPerson;
+import thejavalistener.myfwkauth.domain.AuthCredential;
 
 @RestController
 @RequestMapping("/auth")
@@ -54,17 +57,19 @@ public class AuthController
 	}
 
 	@GetMapping("/me")
-	public ResponseEntity<AuthUserDTO> me(@RequestHeader(value="Authorization", required=false) String authHeader)
+	public ResponseEntity<AuthPersonDTO> me(@RequestHeader(value="Authorization", required=false) String authHeader)
 	{
 		String accessToken = _extractBearer(authHeader);
 		if(accessToken == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-		AuthUser u = auth.getUserFromAccessToken(accessToken);
-		if(u == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+		AuthPerson p = auth.getPersonFromAccessToken(accessToken);
+		if(p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-		return ResponseEntity.ok(AuthUserDTO.from(u));
+		List<AuthCredential> users = auth.getCredentialsByPerson(p.getPersonId());
+
+		return ResponseEntity.ok(AuthPersonDTO.from(p, users));
 	}
-
+	
 	@ExceptionHandler(AuthException.class)
 	public ResponseEntity<AuthError> onAuthException(AuthException ex)
 	{

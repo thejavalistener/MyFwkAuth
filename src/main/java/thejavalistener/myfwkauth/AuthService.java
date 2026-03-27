@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.util.Base64;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,9 +15,10 @@ import thejavalistener.fwkbackend.DaoSupport;
 import thejavalistener.fwkutils.string.MyString;
 import thejavalistener.fwkutils.various.MyDate;
 import thejavalistener.myfwkauth.config.AuthConfig;
+import thejavalistener.myfwkauth.domain.AuthCredential;
 import thejavalistener.myfwkauth.domain.AuthOtp;
+import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthToken;
-import thejavalistener.myfwkauth.domain.AuthUser;
 
 public class AuthService
 {
@@ -30,74 +32,120 @@ public class AuthService
 
 	public AuthService(OtpSender otpSender)
 	{
-		this.otpSender=otpSender;
+		this.otpSender = otpSender;
 	}
+
+	// ================= OTP =================
+
+//	@Transactional
+//	public void generateOtp(OtpChannel channel, String destination)
+//	{
+//		String hql="";
+//		hql+="FROM AuthOtp ";
+//		hql+="WHERE destination=:destination ";
+//		hql+="  AND channel=:channel ";
+//
+//		AuthOtp otp=dao.querySingleRow(hql,"destination",destination,"channel",channel);
+//
+//		if(otp==null)
+//		{
+//			otp=new AuthOtp();
+//			otp.setDestination(destination);
+//			otp.setChannel(channel);
+//			dao.insert(otp);
+//		}
+//
+//		otp.setAttempts(0);
+//
+//		int otpCodeLen=config.otp.length;
+//		String code=MyString.generateRandom('0','9',otpCodeLen,otpCodeLen);
+//		otp.setCodeHash(_hash(code));
+//
+//		long ts=System.currentTimeMillis();
+//		otp.setGeneratedAt(new Timestamp(ts));
+//		otp.setExpiresAt(new Timestamp(ts+config.otp.expirationMs));
+//
+//		otpSender.send(channel,destination,code);
+//	}
 
 	@Transactional
 	public void generateOtp(OtpChannel channel, String destination)
 	{
-		String hql="";
-		hql+="FROM AuthOtp ";
-		hql+="WHERE destination=:destination ";
-		hql+="  AND channel=:channel ";
-		AuthOtp otp=dao.querySingleRow(hql,"destination",destination,"channel",channel);
+		// borrar OTP previo
+		dao.update(
+			"DELETE FROM AuthOtp WHERE channel=:c AND destination=:d",
+			"c", channel,
+			"d", destination
+		);
 
-		if(otp==null)
-		{
-			otp=new AuthOtp();
-			otp.setDestination(destination);
-			otp.setChannel(channel);
-			dao.insert(otp);
-		}
-
+		// crear nuevo OTP directamente
+		AuthOtp otp = new AuthOtp();
+		otp.setDestination(destination);
+		otp.setChannel(channel);
 		otp.setAttempts(0);
 
-		int otpCodeLen=config.otp.length;
-		String code=MyString.generateRandom('0','9',otpCodeLen,otpCodeLen);
+		int otpCodeLen = config.otp.length;
+		String code = MyString.generateRandom('0','9',otpCodeLen,otpCodeLen);
 		otp.setCodeHash(_hash(code));
 
-		long ts=System.currentTimeMillis();
+		long ts = System.currentTimeMillis();
 		otp.setGeneratedAt(new Timestamp(ts));
+		otp.setExpiresAt(new Timestamp(ts + config.otp.expirationMs));
 
-		long otpExpiraEn=config.otp.expirationMs;
-		otp.setExpiresAt(new Timestamp(ts+otpExpiraEn));
+		dao.insert(otp);
 
-		// envio el OTP
-		otpSender.send(channel,destination,code);
+		otpSender.send(channel, destination, code);
 	}
+	
+	// ================= LOGIN =================
 
 	@Transactional
 	public TokenPair login(OtpChannel channel, String destination, String otp) throws AuthException
 	{
-		_verifyOtp(channel,destination,otp); // si falla, lanza excepción
+		_verifyOtp(channel,destination,otp);
 
 		String hql="";
-		hql+="FROM AuthUser ";
+		hql+="FROM AuthCredential ";
 		hql+="WHERE channel=:channel ";
 		hql+="  AND destination=:destination ";
 
-		AuthUser user=dao.querySingleRow(hql,"channel",channel,"destination",destination);
+		AuthCredential cred=dao.querySingleRow(hql,"channel",channel,"destination",destination);
 
-		if(user==null)
+		AuthPerson person;
+
+		if(cred==null)
 		{
-			user=new AuthUser();
-			user.setChannel(channel);
-			user.setDestination(destination);
-			user.setCreatedAt(new Timestamp(System.currentTimeMillis()));
-			dao.insert(user);
+			person=new AuthPerson();
+			person.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+			dao.insert(person);
+
+			cred=new AuthCredential();
+			cred.setChannel(channel);
+			cred.setDestination(destination);
+			cred.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+			cred.setPerson(person);
+			dao.insert(cred);
 		}
-		
-		hql ="UPDATE AuthToken ";
+		else
+		{
+			person=cred.getPerson();
+		}
+
+		// revoke sesiones anteriores
+		hql="";
+		hql+="UPDATE AuthToken ";
 		hql+="   SET revokedAt=:now ";
-		hql+="WHERE user.userId=:id ";
+		hql+="WHERE person.personId=:pid ";
 		hql+="  AND revokedAt IS NULL ";
-		dao.update(hql,"id",user.getUserId(),"now",new Timestamp(System.currentTimeMillis()));
 
+		dao.update(hql,"pid",person.getPersonId(),"now",new Timestamp(System.currentTimeMillis()));
+
+		// crear nuevo token
 		AuthToken t=new AuthToken();
-		t.setUser(user);
+		t.setPerson(person);
 
-		int lenRefresh=config.token.refreshBytes;
 		int lenAccess=config.token.accessBytes;
+		int lenRefresh=config.token.refreshBytes;
 
 		t.setAccessToken(_generateToken(lenAccess));
 		t.setRefreshToken(_generateToken(lenRefresh));
@@ -108,11 +156,8 @@ public class AuthService
 		t.setAccessTokenIssuedAt(nowTs);
 		t.setRefreshTokenIssuedAt(nowTs);
 
-		long refreshExpMs=config.token.refreshExpirationMs;
-		long accessExpMs=config.token.accessExpirationMs;
-
-		t.setAccessTokenExpiresAt(new Timestamp(now+accessExpMs));
-		t.setRefreshTokenExpiresAt(new Timestamp(now+refreshExpMs));
+		t.setAccessTokenExpiresAt(new Timestamp(now+config.token.accessExpirationMs));
+		t.setRefreshTokenExpiresAt(new Timestamp(now+config.token.refreshExpirationMs));
 
 		dao.insert(t);
 
@@ -122,6 +167,46 @@ public class AuthService
 
 		return pair;
 	}
+
+	// ================= TOKEN =================
+
+	private AuthToken _getValidToken(String accessToken)
+	{
+		String hql="";
+		hql+="FROM AuthToken ";
+		hql+="WHERE accessToken=:at ";
+		hql+="AND revokedAt IS NULL ";
+
+		AuthToken t=dao.querySingleRow(hql,"at",accessToken);
+
+		if(t==null) return null;
+
+		long now=System.currentTimeMillis();
+
+		if(t.getAccessTokenExpiresAt()==null || now>t.getAccessTokenExpiresAt().getTime())
+			return null;
+
+		return t;
+	}
+
+	@Transactional(readOnly=true)
+	public AuthPerson getPersonFromAccessToken(String accessToken)
+	{
+		AuthToken t=_getValidToken(accessToken);
+		return t!=null ? t.getPerson() : null;
+	}
+
+	@Transactional(readOnly=true)
+	public List<AuthCredential> getCredentialsByPerson(int personId)
+	{
+		String hql="";
+		hql+="FROM AuthCredential ";
+		hql+="WHERE person.personId=:pid ";
+
+		return dao.queryMultipleRows(hql,"pid",personId);
+	}
+
+	// ================= OTP VERIFY =================
 
 	private void _verifyOtp(OtpChannel channel, String destination, String otp) throws AuthException
 	{
@@ -158,30 +243,8 @@ public class AuthService
 		dao.delete(o);
 	}
 
-	@Transactional(readOnly=true)
-	public AuthUser getUserFromAccessToken(String accessToken)
-	{
-		String hql="";
-		hql+="FROM AuthToken ";
-		hql+="WHERE accessToken=:at ";
-		hql+="AND revokedAt IS NULL ";
-		AuthToken t=dao.querySingleRow(hql,"at",accessToken);
-
-		if(t==null) return null;
-
-		long now=System.currentTimeMillis();
-
-		if(t.getAccessTokenExpiresAt()==null||now>t.getAccessTokenExpiresAt().getTime()) return null;
-
-		return t.getUser();
-	}
-
-	@Transactional(readOnly=true)
-	public Integer getUserIdFromAccessToken(String accessToken)
-	{
-		AuthUser u=getUserFromAccessToken(accessToken);
-		return u!=null?u.getUserId():null;
-	}
+	
+	// ================= REFRESH =================
 
 	@Transactional
 	public TokenPair refresh(String refreshToken)
@@ -190,40 +253,38 @@ public class AuthService
 		hql+="FROM AuthToken ";
 		hql+="WHERE refreshToken=:rt ";
 		hql+="  AND revokedAt IS NULL ";
+
 		AuthToken t=dao.querySingleRow(hql,"rt",refreshToken);
 
 		if(t==null) return null;
 
 		long now=System.currentTimeMillis();
 
-		// Refresh expirado => revocar sesión
-		if(t.getRefreshTokenExpiresAt()==null||now>t.getRefreshTokenExpiresAt().getTime())
+		if(t.getRefreshTokenExpiresAt()==null || now>t.getRefreshTokenExpiresAt().getTime())
 		{
 			t.setRevokedAt(new Timestamp(now));
 			return null;
 		}
 
-		// Rotación obligatoria: nuevo refresh token
 		int lenRefresh=config.token.refreshBytes;
+		int lenAccess=config.token.accessBytes;
+
 		t.setRefreshToken(_generateToken(lenRefresh));
 		t.setRefreshTokenIssuedAt(new Timestamp(now));
+		t.setRefreshTokenExpiresAt(new MyDate(now).addMillis(config.token.refreshExpirationMs).toSqlTimestamp());
 
-		long refreshExpMs=config.token.refreshExpirationMs;
-		t.setRefreshTokenExpiresAt(new MyDate(now).addMillis(refreshExpMs).toSqlTimestamp());
-
-		// Nuevo access token
-		int lenAccess=config.token.accessBytes;
 		t.setAccessToken(_generateToken(lenAccess));
 		t.setAccessTokenIssuedAt(new Timestamp(now));
-
-		long accessExpMs=config.token.accessExpirationMs;
-		t.setAccessTokenExpiresAt(new MyDate(now).addMillis(accessExpMs).toSqlTimestamp());
+		t.setAccessTokenExpiresAt(new MyDate(now).addMillis(config.token.accessExpirationMs).toSqlTimestamp());
 
 		TokenPair pair=new TokenPair();
 		pair.accessToken=t.getAccessToken();
 		pair.refreshToken=t.getRefreshToken();
+
 		return pair;
 	}
+
+	// ================= LOGOUT =================
 
 	@Transactional
 	public void logout(String refreshToken)
@@ -232,6 +293,7 @@ public class AuthService
 		hql+="FROM AuthToken ";
 		hql+="WHERE refreshToken=:rt ";
 		hql+="  AND revokedAt IS NULL ";
+
 		AuthToken t=dao.querySingleRow(hql,"rt",refreshToken);
 
 		if(t!=null)
@@ -241,15 +303,87 @@ public class AuthService
 	}
 
 	@Transactional
-	public void revokeAllSessions(int userId)
+	public void revokeAllSessions(int personId)
 	{
 		String hql="";
 		hql+="UPDATE AuthToken ";
 		hql+="   SET revokedAt=:now ";
-		hql+="WHERE user.userId=:uid ";
+		hql+="WHERE person.personId=:pid ";
 		hql+="  AND revokedAt IS NULL ";
-		dao.update(hql,"uid",userId,"now",new Timestamp(System.currentTimeMillis()));
+
+		dao.update(hql,"pid",personId,"now",new Timestamp(System.currentTimeMillis()));
 	}
+
+//	@Transactional
+//	public void linkCredential(int personId, OtpChannel channel, String destination, String otp) throws AuthException
+//	{
+//		// validar OTP
+//		_verifyOtp(channel, destination, otp);
+//
+//		// evitar duplicados
+//		String hql="";
+//		hql+="FROM AuthCredential ";
+//		hql+="WHERE channel=:channel ";
+//		hql+="  AND destination=:destination ";
+//
+//		AuthCredential existing = dao.querySingleRow(hql, "channel", channel, "destination", destination);
+//
+//		if(existing != null)
+//		{
+//			// ya existe → no hacer nada o lanzar excepción si querés
+//			return;
+//		}
+//
+//		// buscar persona
+//		AuthPerson p = dao.find(AuthPerson.class, personId);
+//		if(p == null) return;
+//
+//		// crear credencial
+//		AuthCredential cred = new AuthCredential();
+//		cred.setChannel(channel);
+//		cred.setDestination(destination);
+//		cred.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+//		cred.setPerson(p);
+//
+//		dao.insert(cred);
+//	}
+
+
+	@Transactional
+	public void linkCredential(int personId, OtpChannel channel, String destination, String otp) throws AuthException
+	{
+		_verifyOtp(channel, destination, otp);
+
+		String hql = "";
+		hql += "FROM AuthCredential ";
+		hql += "WHERE channel=:channel ";
+		hql += "  AND destination=:destination ";
+
+		AuthCredential existing = dao.querySingleRow(hql, "channel", channel, "destination", destination);
+
+		if(existing != null)
+		{
+			if(existing.getPerson() != null && existing.getPerson().getPersonId() == personId) return;
+			throw new AuthException(AuthException.Reason.INVALID_OTP);
+		}
+
+		
+		hql = "";
+		hql += "FROM AuthPerson ";
+		hql += "WHERE personId=:pid ";
+
+		AuthPerson person = dao.querySingleRow(hql, "pid", personId);
+		if(person == null) return;
+
+		AuthCredential cred = new AuthCredential();
+		cred.setPerson(person);
+		cred.setChannel(channel);
+		cred.setDestination(destination);
+		cred.setCreatedAt(new Timestamp(System.currentTimeMillis()));
+		dao.insert(cred);
+	}
+	
+	// ================= UTILS =================
 
 	private static final SecureRandom RNG=new SecureRandom();
 
