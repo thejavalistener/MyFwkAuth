@@ -449,4 +449,126 @@ class AuthServiceTest
         verify(dao).insert(any(AuthCredential.class));
     }
 
+    @Test
+    void linkCredential_samePerson_doesNothing() throws AuthException
+    {
+    	int personId = 1;
+    	String code = "123456";
+
+    	AuthOtp otp = new AuthOtp();
+    	otp.setCodeHash(auth._hash(code));
+    	otp.setExpiresAt(new Timestamp(System.currentTimeMillis() + 60000));
+
+    	AuthPerson person = new AuthPerson();
+    	person.setPersonId(personId);
+
+    	AuthCredential existing = new AuthCredential();
+    	existing.setPerson(person);
+    	existing.setChannel(OtpChannel.EMAIL);
+    	existing.setDestination("x@mail.com");
+
+    	when(dao.querySingleRow(
+    	        argThat(s -> s != null && s.contains("AuthOtp")),
+    	        any(Object[].class)
+    	)).thenReturn(otp);
+    	
+    	when(dao.querySingleRow(
+    	        argThat(s -> s != null && s.contains("AuthCredential")),
+    	        any(Object[].class)
+    	)).thenReturn(existing);
+    	
+    	assertDoesNotThrow(() ->
+    		auth.linkCredential(personId, OtpChannel.EMAIL, "x@mail.com", code)
+    	);
+
+    	verify(dao, times(0)).insert(any(AuthCredential.class));
+    }
+    
+    @Test
+    void linkCredential_otherPerson_throws()
+    {
+    	int personId = 1;
+    	String code = "123456";
+
+    	AuthOtp otp = new AuthOtp();
+    	otp.setCodeHash(auth._hash(code));
+    	otp.setExpiresAt(new Timestamp(System.currentTimeMillis() + 60000));
+
+    	AuthPerson other = new AuthPerson();
+    	other.setPersonId(999);
+
+    	AuthCredential existing = new AuthCredential();
+    	existing.setPerson(other);
+    	existing.setChannel(OtpChannel.EMAIL);
+    	existing.setDestination("x@mail.com");
+
+    	when(dao.querySingleRow(
+    			argThat(s -> s != null && s.contains("AuthOtp")),
+    			any(Object[].class)
+    	)).thenReturn(otp);
+
+    	when(dao.querySingleRow(
+    			argThat(s -> s != null && s.contains("AuthCredential")),
+    			any(Object[].class)
+    	)).thenReturn(existing);
+
+    	AuthException ex = assertThrows(
+    		AuthException.class,
+    		() -> auth.linkCredential(personId, OtpChannel.EMAIL, "x@mail.com", code)
+    	);
+
+    	assertEquals(AuthException.Reason.INVALID_OTP, ex.getReason());
+    }
+    @Test
+    void linkCredential_invalidOtp_throws()
+    {
+    	String correct = "123456";
+    	String wrong = "000000";
+
+    	AuthOtp otp = new AuthOtp();
+    	otp.setCodeHash(auth._hash(correct));
+    	otp.setExpiresAt(new Timestamp(System.currentTimeMillis() + 60000));
+    	otp.setAttempts(0);
+
+    	// mock OTP existente
+    	when(dao.querySingleRow(
+    			argThat(s -> s != null && s.contains("AuthOtp")),
+    			any(Object[].class)
+    	)).thenReturn(otp);
+
+    	AuthException ex = assertThrows(
+    		AuthException.class,
+    		() -> auth.linkCredential(1, OtpChannel.EMAIL, "a@mail.com", wrong)
+    	);
+
+    	assertEquals(AuthException.Reason.INVALID_OTP, ex.getReason());
+
+    	// no debe insertar credencial
+    	verify(dao, times(0)).insert(any(AuthCredential.class));
+    }
+    
+    @Test
+    void linkCredential_expiredOtp_throws()
+    {
+    	String code = "123456";
+
+    	AuthOtp otp = new AuthOtp();
+    	otp.setCodeHash(auth._hash(code));
+    	otp.setExpiresAt(new Timestamp(System.currentTimeMillis() - 1000)); // expirado
+    	otp.setAttempts(0);
+
+    	when(dao.querySingleRow(
+    			argThat(s -> s != null && s.contains("AuthOtp")),
+    			any(Object[].class)
+    	)).thenReturn(otp);
+
+    	AuthException ex = assertThrows(
+    		AuthException.class,
+    		() -> auth.linkCredential(1, OtpChannel.EMAIL, "a@mail.com", code)
+    	);
+
+    	assertEquals(AuthException.Reason.EXPIRED_OTP, ex.getReason());
+
+    	verify(dao).delete(otp);
+    }
 }
