@@ -5,18 +5,18 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import thejavalistener.myfwkauth.AuthException;
+import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
-import thejavalistener.myfwkauth.XX;
-import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthCredential;
+import thejavalistener.myfwkauth.domain.AuthPerson;
 
 public class AuthClient
 {
 	@Autowired
-	private XX auth;
+	private AuthService auth;
 
-	public AuthClient(XX auth)
+	public AuthClient(AuthService auth)
 	{
 		this.auth = auth;
 	}
@@ -25,28 +25,28 @@ public class AuthClient
 
 	public void requestOtp(OtpChannel channel, String destination)
 	{
-		auth.generateOtp(channel, destination);
+		auth.otpGenerate(channel, destination);
 	}
 
 	// ================= LOGIN =================
 
 	public TokenPair login(OtpChannel channel, String destination, String otp) throws AuthException
 	{
-		return auth.login(channel, destination, otp);
+		return auth.sessionLogin(channel, destination, otp);
 	}
 
 	// ================= REFRESH =================
 
 	public TokenPair refresh(String refreshToken)
 	{
-		return auth.refresh(refreshToken);
+		return auth.sessionRefresh(refreshToken);
 	}
 
 	// ================= LOGOUT =================
 
 	public void logout(String refreshToken)
 	{
-		auth.logout(refreshToken);
+		auth.sessionLogout(refreshToken);
 	}
 
 	// ================= ME =================
@@ -55,10 +55,10 @@ public class AuthClient
 	{
 		if(accessToken == null || accessToken.isBlank()) return null;
 
-		AuthPerson p = auth.getPersonFromAccessToken(accessToken);
+		AuthPerson p = auth.personGetByAccessToken(accessToken);
 		if(p == null) return null;
 
-		List<AuthCredential> users = auth.getCredentialsByPerson(p.getPersonId());
+		List<AuthCredential> users = auth.personGetCredentials(p.getPersonId());
 
 		return AuthPersonDTO.from(p, users);
 	}	

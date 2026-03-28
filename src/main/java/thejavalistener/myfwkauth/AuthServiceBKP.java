@@ -20,7 +20,7 @@ import thejavalistener.myfwkauth.domain.AuthOtp;
 import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthToken;
 
-public class AuthService 
+public class AuthServiceBKP 
 {
 	@Autowired
 	private AuthConfig config;
@@ -30,7 +30,7 @@ public class AuthService
 
 	private OtpSender otpSender;
 
-	public AuthService(OtpSender otpSender)
+	public AuthServiceBKP(OtpSender otpSender)
 	{
 		this.otpSender = otpSender;
 	}
@@ -39,7 +39,7 @@ public class AuthService
 
 
 	@Transactional
-	public void otpGenerate(OtpChannel channel, String destination)
+	public void generateOtp(OtpChannel channel, String destination)
 	{
 		// borrar OTP previo
 		dao.update(
@@ -70,7 +70,7 @@ public class AuthService
 	// ================= LOGIN =================
 
 	@Transactional
-	public TokenPair sessionLogin(OtpChannel channel, String destination, String otp) throws AuthException
+	public TokenPair login(OtpChannel channel, String destination, String otp) throws AuthException
 	{
 		_verifyOtp(channel,destination,otp);
 
@@ -78,8 +78,7 @@ public class AuthService
 		hql+="FROM AuthCredential ";
 		hql+="WHERE channel=:channel ";
 		hql+="  AND destination=:destination ";
-		hql+="  AND deletedAt IS NULL ";
-		
+
 		AuthCredential cred=dao.querySingleRow(hql,"channel",channel,"destination",destination);
 
 		AuthPerson person;
@@ -161,19 +160,19 @@ public class AuthService
 	}
 
 	@Transactional(readOnly=true)
-	public AuthPerson personGetByAccessToken(String accessToken)
+	public AuthPerson getPersonFromAccessToken(String accessToken)
 	{
 		AuthToken t=_getValidToken(accessToken);
 		return t!=null ? t.getPerson() : null;
 	}
 
 	@Transactional(readOnly=true)
-	public List<AuthCredential> personGetCredentials(int personId)
+	public List<AuthCredential> getCredentialsByPerson(int personId)
 	{
 		String hql="";
 		hql+="FROM AuthCredential ";
 		hql+="WHERE person.personId=:pid ";
-		hql+="  AND deletedAt IS NULL ";
+
 		return dao.queryMultipleRows(hql,"pid",personId);
 	}
 
@@ -218,7 +217,7 @@ public class AuthService
 	// ================= REFRESH =================
 
 	@Transactional
-	public TokenPair sessionRefresh(String refreshToken)
+	public TokenPair refresh(String refreshToken)
 	{
 		String hql="";
 		hql+="FROM AuthToken ";
@@ -258,7 +257,7 @@ public class AuthService
 	// ================= LOGOUT =================
 
 	@Transactional
-	public void sessionLogout(String refreshToken)
+	public void logout(String refreshToken)
 	{
 		String hql="";
 		hql+="FROM AuthToken ";
@@ -274,7 +273,7 @@ public class AuthService
 	}
 
 	@Transactional
-	public void personRevokeSessions(int personId)
+	public void revokeAllSessions(int personId)
 	{
 		String hql="";
 		hql+="UPDATE AuthToken ";
@@ -286,7 +285,7 @@ public class AuthService
 	}
 
 	@Transactional
-	public void personLinkCredential(int personId, OtpChannel channel, String destination, String otp) throws AuthException
+	public void linkCredential(int personId, OtpChannel channel, String destination, String otp) throws AuthException
 	{
 		_verifyOtp(channel, destination, otp);
 
@@ -294,8 +293,7 @@ public class AuthService
 		hql += "FROM AuthCredential ";
 		hql += "WHERE channel=:channel ";
 		hql += "  AND destination=:destination ";
-		hql += "  AND deletedAt IS NULL ";
-		
+
 		AuthCredential existing = dao.querySingleRow(hql, "channel", channel, "destination", destination);
 
 		if(existing != null)
@@ -322,7 +320,7 @@ public class AuthService
 	
 
 	@Transactional
-	public void personUnlinkCredential(int personId, int credentialId)
+	public void unlinkCredential(int personId, int credentialId)
 	{
 		String hql="";
 		hql+="FROM AuthCredential ";

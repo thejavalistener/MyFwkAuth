@@ -85,7 +85,7 @@ class AuthServiceTest
 	@Test
 	void generateOtp_and_login_ok() throws Exception
 	{
-		auth.generateOtp(CH, DEST);
+		auth.otpGenerate(CH, DEST);
 
 		verify(dao).update(
 			eq("DELETE FROM AuthOtp WHERE channel=:c AND destination=:d"),
@@ -115,7 +115,7 @@ class AuthServiceTest
 			any(), any(), any(), any()
 		)).thenReturn(null);
 
-		TokenPair pair = auth.login(CH, DEST, sentOtp);
+		TokenPair pair = auth.sessionLogin(CH, DEST, sentOtp);
 
 		assertNotNull(pair);
 		assertNotNull(pair.accessToken);
@@ -143,7 +143,7 @@ class AuthServiceTest
 		{
 			try
 			{
-				auth.login(CH, DEST, "000000");
+				auth.sessionLogin(CH, DEST, "000000");
 			}
 			catch(AuthException e)
 			{
@@ -153,7 +153,7 @@ class AuthServiceTest
 
 		AuthException ex = assertThrows(
 			AuthException.class,
-			() -> auth.login(CH, DEST, "000000")
+			() -> auth.sessionLogin(CH, DEST, "000000")
 		);
 
 		assertEquals(AuthException.Reason.BLOCKED_OTP, ex.getReason());
@@ -173,7 +173,7 @@ class AuthServiceTest
 		when(dao.querySingleRow(anyString(), any(), any()))
 			.thenReturn(stored);
 
-		TokenPair pair = auth.refresh("REFRESH_1");
+		TokenPair pair = auth.sessionRefresh("REFRESH_1");
 
 		assertNotNull(pair);
 		assertNotEquals("ACCESS_1", pair.accessToken);
@@ -192,7 +192,7 @@ class AuthServiceTest
 		when(dao.querySingleRow(anyString(), any(), any()))
 			.thenReturn(stored);
 
-		TokenPair pair = auth.refresh("REFRESH_1");
+		TokenPair pair = auth.sessionRefresh("REFRESH_1");
 
 		assertNull(pair);
 		assertNotNull(stored.getRevokedAt());
@@ -218,7 +218,7 @@ class AuthServiceTest
 			any(), any(), any(), any()
 		)).thenReturn(null);
 
-		auth.login(CH, DEST, "123456");
+		auth.sessionLogin(CH, DEST, "123456");
 
 		verify(dao).delete(stored);
 	}
@@ -243,11 +243,11 @@ class AuthServiceTest
 			any(), any(), any(), any()
 		)).thenReturn(null);
 
-		auth.login(CH, DEST, "123456");
+		auth.sessionLogin(CH, DEST, "123456");
 
 		assertThrows(
 			AuthException.class,
-			() -> auth.login(CH, DEST, "123456")
+			() -> auth.sessionLogin(CH, DEST, "123456")
 		);
 	}
 
@@ -266,7 +266,7 @@ class AuthServiceTest
 
 		AuthException ex = assertThrows(
 			AuthException.class,
-			() -> auth.login(CH, DEST, "123456")
+			() -> auth.sessionLogin(CH, DEST, "123456")
 		);
 
 		assertEquals(AuthException.Reason.EXPIRED_OTP, ex.getReason());
@@ -279,7 +279,7 @@ class AuthServiceTest
 		when(dao.querySingleRow(anyString(), any(), any()))
 			.thenReturn(null);
 
-		TokenPair pair = auth.refresh("NO_EXISTE");
+		TokenPair pair = auth.sessionRefresh("NO_EXISTE");
 
 		assertNull(pair);
 	}
@@ -290,7 +290,7 @@ class AuthServiceTest
 		when(dao.querySingleRow(anyString(), any(), any()))
 			.thenReturn(null);
 
-		auth.logout("NO_EXISTE");
+		auth.sessionLogout("NO_EXISTE");
 	}
 
 	@Test
@@ -313,7 +313,7 @@ class AuthServiceTest
 			any(), any(), any(), any()
 		)).thenReturn(null);
 
-		auth.login(CH, DEST, "123456");
+		auth.sessionLogin(CH, DEST, "123456");
 
 		verify(dao).update(anyString(), any(), any(), any(), any());
 	}
@@ -353,8 +353,8 @@ class AuthServiceTest
 			any(), any(), any(), any()
 		)).thenReturn(null).thenReturn(existingCred);
 
-		auth.login(CH, DEST, "123456");
-		auth.login(CH, DEST, "123456");
+		auth.sessionLogin(CH, DEST, "123456");
+		auth.sessionLogin(CH, DEST, "123456");
 
 		verify(dao, times(1)).insert(any(AuthPerson.class));
 		verify(dao, times(1)).insert(any(AuthCredential.class));
@@ -374,7 +374,7 @@ class AuthServiceTest
 		when(dao.querySingleRow(anyString(), any(), any()))
 			.thenReturn(token);
 
-		AuthPerson result = auth.getPersonFromAccessToken("ACCESS_OK");
+		AuthPerson result = auth.personGetByAccessToken("ACCESS_OK");
 
 		assertNotNull(result);
 		assertEquals(42, result.getPersonId());
@@ -383,7 +383,7 @@ class AuthServiceTest
 	@Test
 	void revokeAllSessions_usesPersonId()
 	{
-		auth.revokeAllSessions(42);
+		auth.personRevokeSessions(42);
 
 		verify(dao).update(
 			startsWith("UPDATE AuthToken "),
@@ -422,7 +422,7 @@ class AuthServiceTest
 		)).thenReturn(person);
 
 		assertDoesNotThrow(() -> {
-			auth.linkCredential(personId, OtpChannel.EMAIL, "pablo@test.com", code);
+			auth.personLinkCredential(personId, OtpChannel.EMAIL, "pablo@test.com", code);
 		});
 
 		verify(dao).insert(any(AuthCredential.class));
@@ -458,7 +458,7 @@ class AuthServiceTest
 		)).thenReturn(existing);
 
 		assertDoesNotThrow(() ->
-			auth.linkCredential(personId, OtpChannel.EMAIL, "x@mail.com", code)
+			auth.personLinkCredential(personId, OtpChannel.EMAIL, "x@mail.com", code)
 		);
 
 		verify(dao, never()).insert(any(AuthCredential.class));
@@ -495,7 +495,7 @@ class AuthServiceTest
 
 		AuthException ex = assertThrows(
 			AuthException.class,
-			() -> auth.linkCredential(personId, OtpChannel.EMAIL, "x@mail.com", code)
+			() -> auth.personLinkCredential(personId, OtpChannel.EMAIL, "x@mail.com", code)
 		);
 
 		assertEquals(AuthException.Reason.INVALID_OTP, ex.getReason());
@@ -519,7 +519,7 @@ class AuthServiceTest
 
 		AuthException ex = assertThrows(
 			AuthException.class,
-			() -> auth.linkCredential(1, OtpChannel.EMAIL, "a@mail.com", wrong)
+			() -> auth.personLinkCredential(1, OtpChannel.EMAIL, "a@mail.com", wrong)
 		);
 
 		assertEquals(AuthException.Reason.INVALID_OTP, ex.getReason());
@@ -543,7 +543,7 @@ class AuthServiceTest
 
 		AuthException ex = assertThrows(
 			AuthException.class,
-			() -> auth.linkCredential(1, OtpChannel.EMAIL, "a@mail.com", code)
+			() -> auth.personLinkCredential(1, OtpChannel.EMAIL, "a@mail.com", code)
 		);
 
 		assertEquals(AuthException.Reason.EXPIRED_OTP, ex.getReason());
@@ -571,7 +571,7 @@ class AuthServiceTest
 			any(), any(), any(), any()
 		)).thenReturn(credential);
 
-		auth.unlinkCredential(personId, credentialId);
+		auth.personUnlinkCredential(personId, credentialId);
 
 		assertNotNull(credential.getDeletedAt());
 	}

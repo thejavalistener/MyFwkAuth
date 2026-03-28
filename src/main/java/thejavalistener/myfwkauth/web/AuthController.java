@@ -14,37 +14,37 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import thejavalistener.myfwkauth.AuthException;
+import thejavalistener.myfwkauth.AuthService;
 import thejavalistener.myfwkauth.OtpChannel;
 import thejavalistener.myfwkauth.TokenPair;
-import thejavalistener.myfwkauth.XX;
-import thejavalistener.myfwkauth.domain.AuthPerson;
 import thejavalistener.myfwkauth.domain.AuthCredential;
+import thejavalistener.myfwkauth.domain.AuthPerson;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController
 {
 	@Autowired
-	private XX auth;
+	private AuthService auth;
 	
 	@PostMapping("/otp")
 	public ResponseEntity<Void> requestOtp(@RequestBody OtpRequest req)
 	{
-		auth.generateOtp(req.channel, req.destination);
+		auth.otpGenerate(req.channel, req.destination);
 		return ResponseEntity.ok().build();
 	}
 
 	@PostMapping("/login")
 	public ResponseEntity<TokenPair> login(@RequestBody LoginRequest req) throws AuthException
 	{
-		TokenPair pair = auth.login(req.channel, req.destination, req.otp);
+		TokenPair pair = auth.sessionLogin(req.channel, req.destination, req.otp);
 		return ResponseEntity.ok(pair);
 	}
 
 	@PostMapping("/refresh")
 	public ResponseEntity<TokenPair> refresh(@RequestBody RefreshRequest req)
 	{
-		TokenPair pair = auth.refresh(req.refreshToken);
+		TokenPair pair = auth.sessionRefresh(req.refreshToken);
 		if(pair == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		return ResponseEntity.ok(pair);
 	}
@@ -52,7 +52,7 @@ public class AuthController
 	@PostMapping("/logout")
 	public ResponseEntity<Void> logout(@RequestBody LogoutRequest req)
 	{
-		auth.logout(req.refreshToken);
+		auth.sessionLogout(req.refreshToken);
 		return ResponseEntity.ok().build();
 	}
 
@@ -62,10 +62,10 @@ public class AuthController
 		String accessToken = _extractBearer(authHeader);
 		if(accessToken == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-		AuthPerson p = auth.getPersonFromAccessToken(accessToken);
+		AuthPerson p = auth.personGetByAccessToken(accessToken);
 		if(p == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 
-		List<AuthCredential> users = auth.getCredentialsByPerson(p.getPersonId());
+		List<AuthCredential> users = auth.personGetCredentials(p.getPersonId());
 
 		return ResponseEntity.ok(AuthPersonDTO.from(p, users));
 	}
